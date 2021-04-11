@@ -42,8 +42,8 @@ def process_command(command):
         query = query_companies(parsed_dict, command)
     elif high_level == "countries":
         query = query_countries(parsed_dict, command)
-    # elif high_level == "regions":
-    #     query = query_regions(parsed_dict, command)
+    elif high_level == "regions":
+        query = query_regions(parsed_dict, command)
 
     cur.execute(query)
     results = list(cur.fetchall())
@@ -306,21 +306,21 @@ def query_bars(parsed_dict, cmd):
 
 def query_companies(parsed_dict, cmd):
     """
-        Using a dict representing parsed command from extract_and_group_commands(.),
-        validate parameters and construct SQL for high-level command "countries".
-        Note a user can add parameters in arbitrary order.
+    Using a dict representing parsed command from extract_and_group_commands(.),
+    validate parameters and construct SQL for high-level command "countries".
+    Note a user can add parameters in arbitrary order.
 
-        Parameters
-        ----------
-        parsed_dict: dict
-            A list of parsed symbols.
-        cmd: str
-            Original command used for error message.
+    Parameters
+    ----------
+    parsed_dict: dict
+        A list of parsed symbols.
+    cmd: str
+        Original command used for error message.
 
-        Returns
-        -------
-        query: str
-            The appropriate SQL for the user input.
+    Returns
+    -------
+    query: str
+        The appropriate SQL for the user input.
     """
     assert parsed_dict["high_level"] == "companies", "wrong function used"
     error_msg = f"Command not recognized (invalid selection of parameters): {cmd}"
@@ -329,13 +329,13 @@ def query_companies(parsed_dict, cmd):
         raise InvalidInputError(error_msg)
 
     query = """
-        SELECT Company, C_companies.EnglishName, {aggregate}
-        FROM Bars B JOIN Countries C_companies ON B.CompanyLocationId = C_companies.Id 
-        {filters}
-        GROUP BY Company
-        HAVING COUNT(SpecificBeanBarName) > 4
-        ORDER BY {key} {order}
-        LIMIT {num_entries}
+    SELECT Company, C_companies.EnglishName, {aggregate}
+    FROM Bars B JOIN Countries C_companies ON B.CompanyLocationId = C_companies.Id 
+    {filters}
+    GROUP BY Company
+    HAVING COUNT(SpecificBeanBarName) > 4
+    ORDER BY {key} {order}
+    LIMIT {num_entries}
     """.format
 
     # process group 1 and 2 parameters
@@ -376,62 +376,57 @@ def query_companies(parsed_dict, cmd):
 
 def query_countries(parsed_dict, cmd):
     """
-            Using a dict representing parsed command from extract_and_group_commands(.),
-            validate parameters and construct SQL for high-level command "companies".
-            Note a user can add parameters in arbitrary order.
+    Using a dict representing parsed command from extract_and_group_commands(.),
+    validate parameters and construct SQL for high-level command "companies".
+    Note a user can add parameters in arbitrary order.
 
-            Parameters
-            ----------
-            parsed_dict: dict
-                A list of parsed symbols.
-            cmd: str
-                Original command used for error message.
+    Parameters
+    ----------
+    parsed_dict: dict
+        A list of parsed symbols.
+    cmd: str
+        Original command used for error message.
 
-            Returns
-            -------
-            query: str
-                The appropriate SQL for the user input.
+    Returns
+    -------
+    query: str
+        The appropriate SQL for the user input.
     """
     assert parsed_dict["high_level"] == "countries", "wrong function used"
     error_msg = f"Command not recognized (invalid selection of parameters): {cmd}"
 
     query = """
-            SELECT {countries}, {regions}, {aggregate}
-            FROM Bars B JOIN Countries C_companies ON B.CompanyLocationId = C_companies.Id
-                JOIN Countries C_beans ON B.BroadBeanOriginId = C_beans.Id
-            {filters}
-            GROUP BY {grouping}
-            HAVING COUNT(SpecificBeanBarName) > 4
-            ORDER BY {key} {order}
-            LIMIT {num_entries}
+    SELECT {countries}, {regions}, {aggregate}
+    FROM Bars B JOIN Countries C_companies ON B.CompanyLocationId = C_companies.Id
+        JOIN Countries C_beans ON B.BroadBeanOriginId = C_beans.Id
+    {filters}
+    GROUP BY {grouping}
+    HAVING COUNT(SpecificBeanBarName) > 4
+    ORDER BY {key} {order}
+    LIMIT {num_entries}
     """.format
 
     # process group 1 and 2 parameters
     group1, group2 = parsed_dict["groups"][:2]
+    if group2 == "sell":
+        grouping = "C_companies.EnglishName"
+        countries = "C_companies.EnglishName"
+        regions = "C_companies.Region"
+    elif group2 == "source":
+        grouping = "C_beans.EnglishName"
+        countries = "C_beans.EnglishName"
+        regions = "C_beans.Region"
+
     if group1 is None:
         filters = ""
-        if group2 == "sell":
-            grouping = "C_companies.EnglishName"
-            countries = "C_companies.EnglishName"
-            regions = "C_companies.Region"
-        elif group2 == "source":
-            grouping = "C_beans.EnglishName"
-            countries = "C_beans.EnglishName"
-            regions = "C_beans.Region"
     else:
         g1_key, g1_val = group1.split("=")
         if group2 == "sell":
-            grouping = "C_companies.EnglishName"
-            countries = "C_companies.EnglishName"
-            regions = "C_companies.Region"
             if g1_key == "country":
                 raise InvalidInputError(error_msg)
             elif g1_key == "region":
                 filters = f"WHERE C_companies.Region = '{g1_val}'"
         elif group2 == "source":
-            grouping = "C_beans.EnglishName"
-            countries = "C_beans.EnglishName"
-            regions = "C_beans.Region"
             if g1_key == "country":
                 raise InvalidInputError(error_msg)
             elif g1_key == "region":
@@ -463,8 +458,72 @@ def query_countries(parsed_dict, cmd):
                  grouping=grouping, countries=countries, regions=regions)
 
 
-def query_regions():
-    pass
+def query_regions(parsed_dict, cmd):
+    """
+    Using a dict representing parsed command from extract_and_group_commands(.),
+    validate parameters and construct SQL for high-level command "companies".
+    Note a user can add parameters in arbitrary order.
+
+    Parameters
+    ----------
+    parsed_dict: dict
+        A list of parsed symbols.
+    cmd: str
+        Original command used for error message.
+
+    Returns
+    -------
+    query: str
+        The appropriate SQL for the user input.
+        """
+    assert parsed_dict["high_level"] == "regions", "wrong function used"
+    error_msg = f"Command not recognized (invalid selection of parameters): {cmd}"
+    # user can't input group 1 parameters
+    if not parsed_dict["is_user_input"][0] == -1:
+        raise InvalidInputError(error_msg)
+
+    query = """
+    SELECT {regions}, {aggregate}
+    FROM Bars B JOIN Countries C_companies ON B.CompanyLocationId = C_companies.Id
+        JOIN Countries C_beans ON B.BroadBeanOriginId = C_beans.Id
+    GROUP BY {grouping}
+    HAVING COUNT(SpecificBeanBarName) > 4
+    ORDER BY {key} {order}
+    LIMIT {num_entries}
+    """.format
+
+    # process group 1 and 2 parameters
+    _, group2 = parsed_dict["groups"][:2]
+    if group2 == "sell":
+        grouping = "C_companies.Region"
+        regions = "C_companies.Region"
+    elif group2 == "source":
+        grouping = "C_beans.Region"
+        regions = "C_beans.Region"
+
+    # process group 3 and 4 parameters
+    group3, group4 = parsed_dict["groups"][2:4]
+    if group3 == "ratings":
+        aggregate = "AVG(Rating) AS R_AVG"
+        key = "R_AVG"
+    elif group3 == "cocoa":
+        aggregate = "AVG(CocoaPercent) AS CP_AVG"
+        key = "CP_AVG"
+    elif group3 == "number_of_bars":
+        # aggregate = "COUNT(DISTINCT SpecificBeanBarName) AS B_CNT"
+        aggregate = "COUNT(SpecificBeanBarName) AS B_CNT"
+        key = "B_CNT"
+
+    if group4 == "top":
+        order = "DESC"
+    elif group4 == "bottom":
+        order = "ASC"
+
+    # process group 5 parameters
+    group5 = parsed_dict["groups"][-1]  # Note this is an int.
+    num_entries = group5
+
+    return query(aggregate=aggregate, key=key, order=order, num_entries=num_entries, grouping=grouping, regions=regions)
 
 
 def load_help_text():
@@ -524,5 +583,10 @@ if __name__ == "__main__":
 
     # test for query_countries(.)
     command = "countries region=Asia sell cocoa top"
+    results = process_command(command)
+    print(results)
+
+    # test for query_regions(.)
+    command = "regions source top 3"
     results = process_command(command)
     print(results)
