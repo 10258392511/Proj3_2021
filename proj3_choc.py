@@ -30,20 +30,26 @@ def process_command(command):
     try:
         parsed_dict = extract_and_group_commands(command)
     except InvalidInputError as e:
-        print(e)
-        return []
+        # print(e)
+        # return []
+        raise e
 
     query = None
     # print(f"parsed_dict: {parsed_dict}")
     high_level = parsed_dict["high_level"]
-    if high_level == "bars":
-        query = query_bars(parsed_dict, command)
-    elif high_level == "companies":
-        query = query_companies(parsed_dict, command)
-    elif high_level == "countries":
-        query = query_countries(parsed_dict, command)
-    elif high_level == "regions":
-        query = query_regions(parsed_dict, command)
+    try:
+        if high_level == "bars":
+            query = query_bars(parsed_dict, command)
+        elif high_level == "companies":
+            query = query_companies(parsed_dict, command)
+        elif high_level == "countries":
+            query = query_countries(parsed_dict, command)
+        elif high_level == "regions":
+            query = query_regions(parsed_dict, command)
+    except InvalidInputError as e:
+        # print(e)
+        # return []
+        raise e
 
     cur.execute(query)
     results = list(cur.fetchall())
@@ -73,9 +79,11 @@ def extract_and_group_commands(user_in):
     -------
     dict or raise InvalidInputError
         If the user input is invalid, an InvalidInputError Exception occurs.
-        Otherwise it's the parsed results as a dict.
-        Keys: {"high_level": str, "groups": list[str],
-        "is_user_input": list[int] (-1: no user input, others: user input)}
+        Otherwise it's the parsed results as a dict like
+        {"high_level": str,
+        "groups": list[str],
+        "is_user_input": list[int] (-1: no user input, others: user input),
+        "barplot": bool}
     """
     user_in = user_in.strip()
     parsed_syms = user_in.split(" ")
@@ -165,6 +173,20 @@ def extract_and_group_commands(user_in):
         group5 = int(parsed_syms[group5_ind])
         processed_inds.append(group5_ind)
 
+    # extract barplot param
+    group6_ind = extract_args(["barplot"], parsed_syms)
+    if group6_ind == -2:
+        # return None
+        raise InvalidInputError(error_msg)
+    elif group6_ind == -1:
+        group6 = False
+    else:
+        # "barplot" must be supplied last
+        if group6_ind != len(parsed_syms) - 1:
+            raise InvalidInputError(error_msg)
+        group6 = True
+        processed_inds.append(group6_ind)
+
     # finally there should be no unprocessed parts of the user input
     if not len(processed_inds) == len(parsed_syms):
         # return None
@@ -173,7 +195,8 @@ def extract_and_group_commands(user_in):
     # return the dict
     parsed_dict = {"high_level": high_level,
                    "groups": [group1, group2, group3, group4, group5],
-                   "is_user_input": [group1_ind, group2_ind, group3_ind, group4_ind, group5_ind]}
+                   "is_user_input": [group1_ind, group2_ind, group3_ind, group4_ind, group5_ind],
+                   "barplot": group6}
 
     return parsed_dict
 
@@ -298,7 +321,7 @@ def query_bars(parsed_dict, cmd):
         order = "ASC"
 
     # process group 5 parameters
-    group5  = parsed_dict["groups"][-1]  # Note this is an int.
+    group5 = parsed_dict["groups"][-1]  # Note this is an int.
     num_entries = group5
 
     return query(filters=filters, key=key, order=order, num_entries=num_entries)
@@ -527,7 +550,7 @@ def query_regions(parsed_dict, cmd):
 
 
 def load_help_text():
-    with open('help.txt') as f:
+    with open('Proj3Help.txt') as f:
         return f.read()
 
 
@@ -537,15 +560,78 @@ def interactive_prompt():
     response = ''
     while response != 'exit':
         response = input('Enter a command: ')
+        if response == "exit":
+            break
 
         if response == 'help':
             print(help_text)
             continue
 
+        try:
+            results = process_command(response)
+            high_level = response.split(" ")[0]
+            for record in results:
+                print_record(record, high_level)
+            print()
+        except InvalidInputError as e:
+            print(e)
+            print()
+
+    print("\nBye!")
+
+
+def print_record(record, high_level, text_len=12):
+    """
+    Helper function for part 2. Formatted print of one record as a tuple based on type of the high-level command.
+
+    Parameters
+    ----------
+    record: tuple
+        One record from query results list.
+    high_level: str
+        The high-level command.
+    text_len: int
+        Maximum length of text fields.
+
+    Returns
+    -------
+    None
+    """
+    text_width = text_len + 4
+    numeric_width = 7
+    if high_level == "bars":
+        for ind, entry in enumerate(record):
+            if isinstance(entry, str):
+                if len(entry) > text_len:
+                    entry = entry[:text_len] + "..."
+                print(f"{entry:{text_width}}", end="")
+            elif ind == 3:
+                print(f"{entry:<{numeric_width}.1f}", end="")
+            elif ind == 4:
+                print(f"{entry:<{numeric_width}.0%}", end="")
+
+    elif high_level in ["companies", "countries", "regions"]:
+        for ind, entry in enumerate(record):
+            if isinstance(entry, str):
+                if len(entry) > text_len:
+                    entry = entry[:text_len] + "..."
+                print(f"{entry:{text_width}}", end="")
+            elif isinstance(entry, int):
+                print(f"{entry:<{numeric_width}d}", end="")
+            elif isinstance(entry, float):
+                print(f"{entry:<{numeric_width}.1f}", end="")
+
+    elif high_level == "countries":
+        pass
+    elif high_level == "regions":
+        pass
+
+    print()
+
 
 # Make sure nothing runs or prints out when this file is run as a module/library
 if __name__ == "__main__":
-    # interactive_prompt()
+    interactive_prompt()
 
     # # test for extract_and_group_commands(.)
     # user_in = "regions"
@@ -571,22 +657,77 @@ if __name__ == "__main__":
     #
     #     print("-" * 30)
 
-    # test for query_bars(.)
-    command = "bars country=BR source ratings bottom 8"
-    results = process_command(command)
-    print(results)
+    # # test for query_bars(.)
+    # command = "bars country=BR source ratings bottom 8"
+    # results = process_command(command)
+    # print(results)
+    #
+    # # test for query_companies(.)
+    # command = "companies region=Europe number_of_bars 12"
+    # results = process_command(command)
+    # print(results)
+    #
+    # # test for query_countries(.)
+    # command = "countries region=Asia sell cocoa top"
+    # results = process_command(command)
+    # print(results)
+    #
+    # # test for query_regions(.)
+    # command = "regions source top 3"
+    # results = process_command(command)
+    # print(results)
 
-    # test for query_companies(.)
-    command = "companies region=Europe number_of_bars 12"
-    results = process_command(command)
-    print(results)
+    # # test for "barplot" param
+    # command = "regions source top barplot 3"
+    # parsed_dict = extract_and_group_commands(command)
+    # print(parsed_dict)
+    # results = process_command(command)
+    # print(results)
 
-    # test for query_countries(.)
-    command = "countries region=Asia sell cocoa top"
-    results = process_command(command)
-    print(results)
+    # # test for print_record(.)
+    # command = "bars ratings"
+    # command = "companies region=Europe number_of_bars"
+    # command = "companies ratings top 8"
+    # command = "countries number_of_bars"
+    # command = "countries region=Asia ratings"
+    # command = "regions number_of_bars"
+    # command = "regions ratings"
+    # results = process_command(command)
+    # # print(results)
+    # for record in results:
+    #     # print(record)
+    #     # for ind, entry in enumerate(record):
+    #     #     print(f"{ind}, {entry}")
+    #     print_record(record, "regions")
 
-    # test for query_regions(.)
-    command = "regions source top 3"
-    results = process_command(command)
-    print(results)
+    # # test for interactive_prompt(.) using file input
+    # with open("user_inputs.txt", "r") as rf:
+    #     help_text = load_help_text()
+    #     response = ''
+    #     while response != 'exit':
+    #         print("Enter a command: ", end="")
+    #         response = rf.readline().strip()
+    #         if len(response) == 0:
+    #             break
+    #         print(response)
+    #         response = response[2:]
+    #
+    #         if response == "exit":
+    #             break
+    #
+    #         if response == 'help':
+    #             print(help_text)
+    #             continue
+    #
+    #         try:
+    #             results = process_command(response)
+    #             high_level = response.split(" ")[0]
+    #             for record in results:
+    #                 print_record(record, high_level)
+    #             print()
+    #         except InvalidInputError as e:
+    #             print(e)
+    #             print()
+    #
+    #     print("\nBye!")
+    pass
