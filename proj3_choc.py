@@ -656,7 +656,7 @@ def barplot(records, g3_param, high_level):
         return lambda: val
 
     xvals = [record[0] for record in records]
-    keys = {"bars": {"rating": 3, "cocoa": 4},
+    keys = {"bars": {"ratings": 3, "cocoa": 4},
             "companies": defaultdict(const_fact(-1)),
             "countries": defaultdict(const_fact(-1)),
             "regions": defaultdict(const_fact(-1))}
