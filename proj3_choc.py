@@ -95,20 +95,15 @@ def extract_and_group_commands(user_in):
 
     # extract high-level command
     high_level_syms = ["bars", "companies", "countries", "regions"]
-    has_high_level = False
-    high_level = None
-    for sym in high_level_syms:
-        if parsed_syms[0] == sym:
-            if has_high_level:  # multiple high-level commands: invalid
-                # return None
-                raise InvalidInputError(error_msg)
-            high_level = sym
-            has_high_level = True
-
-    if not has_high_level:
+    high_level_ind = extract_args(high_level_syms, parsed_syms)
+    if high_level_ind == -2 or high_level_ind > 0:  # multiple or not the first one
+        raise InvalidInputError(error_msg)
+    elif high_level_ind == -1:
         high_level = "bars"
     else:
-        processed_inds.append(0)
+        processed_inds.append(high_level_ind)
+        high_level = parsed_syms[0]
+
     # print(f"High level: {high_level}")
 
     # extract group 1 params
@@ -569,7 +564,8 @@ def interactive_prompt():
 
         try:
             results = process_command(response)
-            high_level = response.split(" ")[0]
+            parsed_dict = extract_and_group_commands(response)
+            high_level = parsed_dict["high_level"]
             for record in results:
                 print_record(record, high_level)
             print()
@@ -621,113 +617,10 @@ def print_record(record, high_level, text_len=12):
             elif isinstance(entry, float):
                 print(f"{entry:<{numeric_width}.1f}", end="")
 
-    elif high_level == "countries":
-        pass
-    elif high_level == "regions":
-        pass
-
     print()
 
 
 # Make sure nothing runs or prints out when this file is run as a module/library
 if __name__ == "__main__":
     interactive_prompt()
-
-    # # test for extract_and_group_commands(.)
-    # user_in = "regions"
-    # print(extract_and_group_commands(user_in))
-    # commands = []
-    # with open("user_inputs.txt", "r") as rf:
-    #     line = rf.readline().strip()
-    #     while len(line) > 0:
-    #         commands.append((int(line[:1]), line[2:]))
-    #         line = rf.readline().strip()
-    #
-    # for cate, command in commands:
-    #     if cate == 0:
-    #         print(f"original command: ", end="")
-    #     elif cate == 1:
-    #         print(f"reordered command: ", end="")
-    #
-    #     print(command)
-    #     try:
-    #         print(extract_and_group_commands(command))
-    #     except InvalidInputError as e:
-    #         print(e)
-    #
-    #     print("-" * 30)
-
-    # # test for query_bars(.)
-    # command = "bars country=BR source ratings bottom 8"
-    # results = process_command(command)
-    # print(results)
-    #
-    # # test for query_companies(.)
-    # command = "companies region=Europe number_of_bars 12"
-    # results = process_command(command)
-    # print(results)
-    #
-    # # test for query_countries(.)
-    # command = "countries region=Asia sell cocoa top"
-    # results = process_command(command)
-    # print(results)
-    #
-    # # test for query_regions(.)
-    # command = "regions source top 3"
-    # results = process_command(command)
-    # print(results)
-
-    # # test for "barplot" param
-    # command = "regions source top barplot 3"
-    # parsed_dict = extract_and_group_commands(command)
-    # print(parsed_dict)
-    # results = process_command(command)
-    # print(results)
-
-    # # test for print_record(.)
-    # command = "bars ratings"
-    # command = "companies region=Europe number_of_bars"
-    # command = "companies ratings top 8"
-    # command = "countries number_of_bars"
-    # command = "countries region=Asia ratings"
-    # command = "regions number_of_bars"
-    # command = "regions ratings"
-    # results = process_command(command)
-    # # print(results)
-    # for record in results:
-    #     # print(record)
-    #     # for ind, entry in enumerate(record):
-    #     #     print(f"{ind}, {entry}")
-    #     print_record(record, "regions")
-
-    # # test for interactive_prompt(.) using file input
-    # with open("user_inputs.txt", "r") as rf:
-    #     help_text = load_help_text()
-    #     response = ''
-    #     while response != 'exit':
-    #         print("Enter a command: ", end="")
-    #         response = rf.readline().strip()
-    #         if len(response) == 0:
-    #             break
-    #         print(response)
-    #         response = response[2:]
-    #
-    #         if response == "exit":
-    #             break
-    #
-    #         if response == 'help':
-    #             print(help_text)
-    #             continue
-    #
-    #         try:
-    #             results = process_command(response)
-    #             high_level = response.split(" ")[0]
-    #             for record in results:
-    #                 print_record(record, high_level)
-    #             print()
-    #         except InvalidInputError as e:
-    #             print(e)
-    #             print()
-    #
-    #     print("\nBye!")
     pass
