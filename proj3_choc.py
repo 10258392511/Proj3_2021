@@ -1,5 +1,14 @@
+######################
+# Name: Zhexin Wu
+# Uniquename: zhexinwu
+######################
+
+
 import sqlite3
 import re
+import plotly.graph_objects as go
+from collections import defaultdict
+
 
 # proj3_choc.py
 # You can change anything in this file you want as long as you pass the tests
@@ -558,6 +567,9 @@ def interactive_prompt():
         if response == "exit":
             break
 
+        if len(response) == 0:
+            continue
+
         if response == 'help':
             print(help_text)
             continue
@@ -566,9 +578,12 @@ def interactive_prompt():
             results = process_command(response)
             parsed_dict = extract_and_group_commands(response)
             high_level = parsed_dict["high_level"]
-            for record in results:
-                print_record(record, high_level)
-            print()
+            if not parsed_dict["barplot"]:
+                for record in results:
+                    print_record(record, high_level)
+                print()
+            else:
+                barplot(results, parsed_dict["groups"][2], parsed_dict["high_level"])
         except InvalidInputError as e:
             print(e)
             print()
@@ -620,7 +635,42 @@ def print_record(record, high_level, text_len=12):
     print()
 
 
+def barplot(records, g3_param, high_level):
+    """
+    Make a bar chart and show it if "barplot" is True.
+
+    Parameters
+    ----------
+    records: list
+        A list of tuples. Query results.
+    g3_param: str
+        Group 3 parameters: ratings, cocoa or number_of_bars.
+    high_level: str
+        The high-level command.
+
+    Returns
+    -------
+    None
+    """
+    def const_fact(val):
+        return lambda: val
+
+    xvals = [record[0] for record in records]
+    keys = {"bars": {"rating": 3, "cocoa": 4},
+            "companies": defaultdict(const_fact(-1)),
+            "countries": defaultdict(const_fact(-1)),
+            "regions": defaultdict(const_fact(-1))}
+    yvals = [record[keys[high_level][g3_param]] for record in records]
+    trace = go.Bar(x=xvals, y=yvals)
+    data = [trace]
+    if high_level == "bars":
+        layout = {"xaxis": {"tickangle": 20}}
+    else:
+        layout = {}
+    fig = go.Figure(data=data, layout=layout)
+    fig.show()
+
+
 # Make sure nothing runs or prints out when this file is run as a module/library
 if __name__ == "__main__":
     interactive_prompt()
-    pass
